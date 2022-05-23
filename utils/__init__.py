@@ -174,9 +174,9 @@ def reorder_vertexes(vertexes):
 
 
 def postprocess_boxes(boxes, scale, height, width):
-    boxes /= scale
-    boxes[:, 0] = np.clip(boxes[:, 0], 0, width - 1)
-    boxes[:, 1] = np.clip(boxes[:, 1], 0, height - 1)
-    boxes[:, 2] = np.clip(boxes[:, 2], 0, width - 1)
-    boxes[:, 3] = np.clip(boxes[:, 3], 0, height - 1)
-    return boxes
+    new_boxes = boxes / scale
+    new_boxes[:, 0] = np.clip(new_boxes[:, 0], 0, width - 1)
+    new_boxes[:, 1] = np.clip(new_boxes[:, 1], 0, height - 1)
+    new_boxes[:, 2] = np.clip(new_boxes[:, 2], 0, width - 1)
+    new_boxes[:, 3] = np.clip(new_boxes[:, 3], 0, height - 1)
+    return new_boxes

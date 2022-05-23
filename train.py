@@ -1,19 +1,3 @@
-"""
-Copyright 2017-2018 Fizyr (https://fizyr.com)
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
-
 import argparse
 from datetime import date
 import os
@@ -91,13 +75,8 @@ def create_callbacks(training_model, prediction_model, validation_generator, arg
         callbacks.append(tensorboard_callback)
 
     if args.evaluation and validation_generator:
-        if args.dataset_type == 'coco':
-            from eval.coco import Evaluate
-            # use prediction model for evaluation
-            evaluation = Evaluate(validation_generator, prediction_model, tensorboard=tensorboard_callback)
-        else:
-            from eval.pascal import Evaluate
-            evaluation = Evaluate(validation_generator, prediction_model, tensorboard=tensorboard_callback)
+        from eval.pascal import Evaluate
+        evaluation = Evaluate(validation_generator, prediction_model, tensorboard=tensorboard_callback)
         callbacks.append(evaluation)
 
     # save the model
@@ -156,8 +135,8 @@ def create_generators(args):
         visual_effect = None
 
     if args.dataset_type == 'pascal':
-        from generators.pascal import PascalVocGenerator
-        train_generator = PascalVocGenerator(
+        from generators.simple import SimpleGenerator
+        train_generator = SimpleGenerator(
             args.pascal_path,
             'trainval',
             skip_difficult=True,
@@ -166,47 +145,10 @@ def create_generators(args):
             **common_args
         )
 
-        validation_generator = PascalVocGenerator(
+        validation_generator = SimpleGenerator(
             args.pascal_path,
             'val',
             skip_difficult=True,
-            shuffle_groups=False,
-            **common_args
-        )
-    elif args.dataset_type == 'csv':
-        from generators.csv_ import CSVGenerator
-        train_generator = CSVGenerator(
-            args.annotations_path,
-            args.classes_path,
-            misc_effect=misc_effect,
-            visual_effect=visual_effect,
-            **common_args
-        )
-
-        if args.val_annotations_path:
-            validation_generator = CSVGenerator(
-                args.val_annotations_path,
-                args.classes_path,
-                shuffle_groups=False,
-                **common_args
-            )
-        else:
-            validation_generator = None
-    elif args.dataset_type == 'coco':
-        # import here to prevent unnecessary dependency on cocoapi
-        from generators.coco import CocoGenerator
-        train_generator = CocoGenerator(
-            args.coco_path,
-            'train2017',
-            misc_effect=misc_effect,
-            visual_effect=visual_effect,
-            group_method='random',
-            **common_args
-        )
-
-        validation_generator = CocoGenerator(
-            args.coco_path,
-            'val2017',
             shuffle_groups=False,
             **common_args
         )
@@ -247,17 +189,9 @@ def parse_args(args):
     subparsers = parser.add_subparsers(help='Arguments for specific dataset types.', dest='dataset_type')
     subparsers.required = True
 
-    coco_parser = subparsers.add_parser('coco')
-    coco_parser.add_argument('coco_path', help='Path to dataset directory (ie. /tmp/COCO).')
-
     pascal_parser = subparsers.add_parser('pascal')
     pascal_parser.add_argument('pascal_path', help='Path to dataset directory (ie. /tmp/VOCdevkit).')
 
-    csv_parser = subparsers.add_parser('csv')
-    csv_parser.add_argument('annotations_path', help='Path to CSV file containing annotations for training.')
-    csv_parser.add_argument('classes_path', help='Path to a CSV file containing class label mapping.')
-    csv_parser.add_argument('--val-annotations-path',
-                            help='Path to CSV file containing annotations for validation (optional).')
     parser.add_argument('--detect-quadrangle', help='If to detect quadrangle.', action='store_true', default=False)
     parser.add_argument('--detect-text', help='If is text detection task.', action='store_true', default=False)
 
@@ -269,6 +203,7 @@ def parse_args(args):
     parser.add_argument('--batch-size', help='Size of the batches.', default=1, type=int)
     parser.add_argument('--phi', help='Hyper parameter phi', default=0, type=int, choices=(0, 1, 2, 3, 4, 5, 6))
     parser.add_argument('--gpu', help='Id of the GPU to use (as reported by nvidia-smi).')
+    parser.add_argument('--initial-epoch',    help='Epoch from which to begin the train, useful if resuming from snapshot.', type=int, default=0)
     parser.add_argument('--epochs', help='Number of epochs to train.', type=int, default=50)
     parser.add_argument('--steps', help='Number of steps per epoch.', type=int, default=10000)
     parser.add_argument('--snapshot-path',
@@ -366,7 +301,7 @@ def main(args=None):
     return model.fit_generator(
         generator=train_generator,
         steps_per_epoch=args.steps,
-        initial_epoch=0,
+        initial_epoch=args.initial_epoch,
         epochs=args.epochs,
         verbose=1,
         callbacks=callbacks,

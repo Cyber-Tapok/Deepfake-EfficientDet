@@ -1,19 +1,3 @@
-"""
-Copyright 2017-2018 Fizyr (https://fizyr.com)
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
-"""
-
 from utils.compute_overlap import compute_overlap
 from utils.visualization import draw_detections, draw_annotations
 
@@ -87,7 +71,9 @@ def _get_detections(generator, model, score_threshold=0.05, max_detections=100, 
 
         # run network
         boxes, scores, *_, labels = model.predict_on_batch([np.expand_dims(image, axis=0)])
-        boxes /= scale
+        boxes = boxes.numpy() / scale   
+        scores = scores.numpy()         
+        labels = labels.numpy()        
         boxes[:, :, 0] = np.clip(boxes[:, :, 0], 0, w - 1)
         boxes[:, :, 1] = np.clip(boxes[:, :, 1], 0, h - 1)
         boxes[:, :, 2] = np.clip(boxes[:, :, 2], 0, w - 1)
@@ -261,43 +247,3 @@ def evaluate(
     print('num_fp={}, num_tp={}'.format(num_fp, num_tp))
 
     return average_precisions
-
-
-if __name__ == '__main__':
-    from generators.pascal import PascalVocGenerator
-    from model import efficientdet
-    import os
-
-    os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-
-    phi = 1
-    weighted_bifpn = False
-    common_args = {
-        'batch_size': 1,
-        'phi': phi,
-    }
-    test_generator = PascalVocGenerator(
-        'datasets/VOC2007',
-        'test',
-        shuffle_groups=False,
-        skip_truncated=False,
-        skip_difficult=True,
-        **common_args
-    )
-    model_path = 'checkpoints/2019-12-03/pascal_05_0.6283_1.1975_0.8029.h5'
-    input_shape = (test_generator.image_size, test_generator.image_size)
-    anchors = test_generator.anchors
-    num_classes = test_generator.num_classes()
-    model, prediction_model = efficientdet(phi=phi, num_classes=num_classes, weighted_bifpn=weighted_bifpn)
-    prediction_model.load_weights(model_path, by_name=True)
-    average_precisions = evaluate(test_generator, prediction_model, visualize=False)
-    # compute per class average precision
-    total_instances = []
-    precisions = []
-    for label, (average_precision, num_annotations) in average_precisions.items():
-        print('{:.0f} instances of class'.format(num_annotations), test_generator.label_to_name(label),
-              'with average precision: {:.4f}'.format(average_precision))
-        total_instances.append(num_annotations)
-        precisions.append(average_precision)
-    mean_ap = sum(precisions) / sum(x > 0 for x in total_instances)
-    print('mAP: {:.4f}'.format(mean_ap))
